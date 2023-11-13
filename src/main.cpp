@@ -20,9 +20,12 @@ WiFiUDP UDPInstance; //Communication protocol
 NTPClient NTPClass(UDPInstance,utcOffsetInSeconds); //Network time protocol objecty to get time online
 Adafruit_NeoPixel strip(LED_COUNT, LED_CONTROL_PIN, NEO_RGB + NEO_KHZ800); //The LED strip object to control the NeoPixels
 
+
 int iSecond; //The next 3 variables hold time, either from the Interned or demo (Simulation)
 int iMinute;
 int iHour;
+
+int DaylightST = 0;
 
 float iRedModifier = 1; //Colour modifiers for the NewP{ixel, allows change of the colour of the "clock face"
 float iGreenModifier = 1;
@@ -58,13 +61,13 @@ void setup() {
   Serial.begin(115200); //Just to help with debugging once plugged into a PC
 
       WiFiManager wifiManager;
-        
+
       wifiManager.autoConnect("SundialAP");
 
       Serial.print("Connected");
       Serial.print("\n");
       Serial.println(WiFi.localIP());
-
+      //Serial.println(WiFi.macAddress());
 
   // Initialise the objects we've declared 
   NTPClass.begin();
@@ -73,6 +76,7 @@ void setup() {
   strip.setBrightness(255);
 
   NTPClass.update(); //update time
+
   SerialPrintTime (iSecond,iMinute,iHour);
 
 }
@@ -80,6 +84,8 @@ void setup() {
 void loop() {  
 
   NTPClass.update(); //update time
+
+
   //SerialPrintTime (iSecond,iMinute,iHour);
  
 
@@ -202,6 +208,39 @@ void loop() {
           myClient.flush();
 
         }
+        else if (line.indexOf("GET /stop") >= 0) {
+          //stop demo
+          
+          SIMULATE = 0;
+
+          Serial.print("Stop Demo:");
+          Serial.print('\n');          
+          myClient.flush();
+
+        }
+        else if (line.indexOf("GET /dlst") >= 0) {
+          //daylight savings time
+          
+          line.remove(11);          
+          line.remove(0,9);
+
+          
+          DaylightST = line.toInt();
+
+              if (DaylightST > 0){
+                DaylightST = 1;
+              }
+              else{
+                DaylightST = 0;
+              }
+          
+          
+          Serial.print("Manual Hour:");
+          Serial.print(mHour);
+          Serial.print('\n');          
+          myClient.flush();
+
+        }
 
                 else if (line.indexOf("GET /mins") >= 0) {
           //time
@@ -223,13 +262,13 @@ void loop() {
 
         }
         
-        else if (line.indexOf("GET /local") >= 0) {
+        else if (line.indexOf("GET /white") >= 0) {
           //white
           iRedModifier = 1;
           iGreenModifier = 1;
           iBlueModifier = 1;
           myClient.flush();
-          Serial.print("Local Time");
+          Serial.print("Changed to white");
           SerialPrintTime (iSecond,iMinute,iHour);
           Serial.print('\n');
         }
@@ -239,34 +278,41 @@ void loop() {
             myClient.println("HTTP/1.1 200 OK");
             myClient.println("Content-type:text/html");
             myClient.println();
-            myClient.print("<body><font size=""22"">  <br> Color Mix:<br>");
+            myClient.print("<body BGCOLOR=""black"" font size=""22"" text=""white"">  <br> Color Mix:<br>");
 
-            myClient.print("Red:");
+            myClient.print("Red: ");
             myClient.print(iRedModifier);
             myClient.print("<br>");
 
-            myClient.print("Green:");
+            myClient.print("Green: ");
             myClient.print(iGreenModifier);
             myClient.print("<br>");
 
 
-            myClient.print("Blue:");
+            myClient.print("Blue: ");
             myClient.print(iBlueModifier);
             myClient.print("<br><hr>");     
 
-            myClient.print("Manual Hour:");
+            myClient.print("Manual Hour: ");
             myClient.print(mHour);
             myClient.print("<br>");  
 
-            myClient.print("Manual Mins:");
+            myClient.print("Manual Mins: ");
             myClient.print(mMins);
+            myClient.print("<br><hr>");  
+
+            myClient.print("Daylight Savings Time: ");
+            myClient.print(DaylightST);
+            myClient.print("<br><hr>");
+            myClient.print("Adjusted Hour: ");
+            myClient.print(iHour);
             myClient.print("<br><hr>");  
 
             NTPClass.update();
   
-            myClient.print("Local Time:");
+            myClient.print("Local Time w/o DLS: ");
             myClient.print(NTPClass.getFormattedTime());
-            myClient.print("<br> <br> </font><footer> <hr> <font size=""8""> Usage: /red(1,0), /green(1,0), /blue(1,0), /hour(1-12), /mins(1-60), /demo </font></hr></footer></body>");     
+            myClient.print("<br> <br> </font> </font size=""6""><footer> <hr> Usage: /white, /red(1,0), /green(1,0), /blue(1,0), /hour(0-12), /mins(0-60), /dlst(1,0) Daylight savings, /demo </font></hr></footer></body>");     
   
             
             myClient.println();
@@ -285,6 +331,20 @@ void loop() {
         iHour = NTPClass.getHours();
       }
       delay(1000);
+    
+    
+    if (DaylightST !=0 ){   //If daylight saving is not false
+
+    if (iHour == 1) {
+      iHour = 12;
+      Serial.print("ITS 12 WHY???");
+    }
+    
+    else {
+      iHour = (iHour - 1);
+    }
+
+  }
     }
    // this is where we loop throug time if in demo mode (insde SimulateTime function)
     else {
